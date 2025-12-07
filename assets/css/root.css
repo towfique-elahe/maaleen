@@ -1,0 +1,63 @@
+/* importing fonts */
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap");
+
+@font-face {
+  font-family: "DreamAvenue";
+  src: url("assets/fonts/dream-avenue-regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  /* global colors */
+  --primary-color: #c59e75;
+  --secondary-color: #ffefe1;
+  --text-color: #585858;
+  --dark-text-color: #222222;
+  --accent-color: #370007;
+  --gray-background-color: #fdfdfd;
+  --whhite-background-color: #ffffff;
+
+  /* global fonts */
+  --primary-font-family: "DreamAvenue", serif;
+  --primary-font-size: 54px;
+  --primary-font-weight: 700;
+
+  --secondary-font-family: "Playfair", serif;
+  --secondary-font-size: 20px;
+  --secondary-font-weight: 700;
+
+  --text-font-family: "Open Sans", sans-serif;
+  --text-font-size: 14px;
+  --text-font-weight: 500;
+
+  --accent-font-family: "Open Sans", sans-serif;
+  --accent-font-size: 14px;
+  --accent-font-weight: 600;
+
+  /* border */
+  --border: solid 1px #d9d9d9;
+
+  /* box shadow */
+  --box-shadow-light: 0 5px 15px rgba(0, 0, 0, 0.1);
+  --box-shadow-medium: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+*::selection {
+  background-color: var(--accent-color);
+  color: var(--whhite-background-color);
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  column-gap: 10px;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  row-gap: 10px;
+}
