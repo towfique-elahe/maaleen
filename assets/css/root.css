@@ -43,6 +43,10 @@
   --box-shadow-medium: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
+body {
+  margin: 0 !important;
+}
+
 *::selection {
   background-color: var(--accent-color);
   color: var(--whhite-background-color);
