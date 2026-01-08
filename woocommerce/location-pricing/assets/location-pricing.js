@@ -5,7 +5,7 @@
   window.wcLocation = {
     init: function () {
       this.bindEvents();
-      this.checkLocationCookie();
+      // Remove auto-check on init since we handle it in PHP
     },
 
     bindEvents: function () {
@@ -15,7 +15,17 @@
         ".wc-location-modal__close, .wc-location-modal__overlay",
         function (e) {
           e.preventDefault();
-          $("#wc-location-modal").fadeOut(300);
+          wcLocation.hideModal();
+        }
+      );
+
+      // Trigger button click
+      $(document).on(
+        "click",
+        "#wc-change-location-trigger, .wc-change-location-btn",
+        function (e) {
+          e.preventDefault();
+          wcLocation.showModal();
         }
       );
 
@@ -46,21 +56,31 @@
       // Escape key to close modal
       $(document).on("keyup", function (e) {
         if (e.key === "Escape" && $("#wc-location-modal").is(":visible")) {
-          $("#wc-location-modal").fadeOut(300);
+          wcLocation.hideModal();
         }
+      });
+
+      // Prevent modal close when clicking inside content
+      $(document).on("click", ".wc-location-modal__content", function (e) {
+        e.stopPropagation();
       });
     },
 
-    checkLocationCookie: function () {
-      if (
-        !localStorage.getItem("wc_user_location") &&
-        !document.cookie.match(/wc_user_location/)
-      ) {
-        // Show modal after delay
-        setTimeout(function () {
-          $("#wc-location-modal").fadeIn(300);
-        }, 1000);
-      }
+    showModal: function () {
+      $("#wc-location-modal").css("display", "flex");
+      $("body").addClass("wc-location-modal-open");
+      // Animate in
+      setTimeout(function () {
+        $(".wc-location-modal__content").addClass("wc-modal-visible");
+      }, 10);
+    },
+
+    hideModal: function () {
+      $(".wc-location-modal__content").removeClass("wc-modal-visible");
+      setTimeout(function () {
+        $("#wc-location-modal").fadeOut(300);
+        $("body").removeClass("wc-location-modal-open");
+      }, 200);
     },
 
     switchLocation: function (location) {
@@ -68,6 +88,9 @@
         console.error("Invalid location:", location);
         return;
       }
+
+      // Close modal after selection
+      this.hideModal();
 
       // Show loading state
       var $switcher = $(".wc-location-switcher, .wc-location-indicator");
@@ -90,10 +113,13 @@
             // Show success message
             wcLocation.showMessage(response.data.message, "success");
 
-            // Reload page to update prices
-            setTimeout(function () {
-              location.reload();
-            }, 800);
+            // Update prices dynamically without reload
+            wcLocation.updatePrices();
+
+            // Optional: Clear cart if needed
+            if (response.data.clear_cart) {
+              wcLocation.clearCart();
+            }
           } else {
             wcLocation.showMessage("Failed to update location", "error");
           }
@@ -130,6 +156,78 @@
 
       // Update select value
       $(".wc-location-select").val(location);
+
+      // Update button text if dynamic button is used
+      $(".wc-change-location-btn").each(function () {
+        var $btn = $(this);
+        if ($btn.find(".wc-current-location-text").length) {
+          $btn
+            .find(".wc-current-location-text")
+            .html(
+              locationNames[location].flag + " " + locationNames[location].name
+            );
+        }
+      });
+    },
+
+    updatePrices: function () {
+      // Update prices via AJAX or refresh product elements
+      if (typeof wc_location_data.update_prices_url !== "undefined") {
+        $.ajax({
+          url: wc_location_data.update_prices_url,
+          type: "GET",
+          success: function (response) {
+            // Update product prices on the page
+            $(".price").each(function () {
+              var $price = $(this);
+              var productId = $price.closest(".product").data("product_id");
+              if (productId && response.prices && response.prices[productId]) {
+                $price.html(response.prices[productId]);
+              }
+            });
+          },
+        });
+      } else {
+        // Fallback: reload only product containers, not entire page
+        $(".product, .woocommerce-loop-product__link, .product-details").each(
+          function () {
+            var $container = $(this);
+            if ($container.data("product-id")) {
+              $.ajax({
+                url: window.location.href,
+                type: "GET",
+                data: { wc_update_price: $container.data("product-id") },
+                success: function (html) {
+                  var $newContent = $(html).find(
+                    '[data-product-id="' + $container.data("product-id") + '"]'
+                  );
+                  if ($newContent.length) {
+                    $container.replaceWith($newContent);
+                  }
+                },
+              });
+            }
+          }
+        );
+      }
+    },
+
+    clearCart: function () {
+      if (confirm("Switching location will clear your cart. Continue?")) {
+        $.ajax({
+          url: wc_location_data.ajax_url,
+          type: "POST",
+          data: {
+            action: "wc_clear_cart",
+            nonce: wc_location_data.nonce,
+          },
+          success: function () {
+            $(".cart-contents").html("0");
+            $(".woocommerce-cart-form").remove();
+            $(".cart-empty").show();
+          },
+        });
+      }
     },
 
     showMessage: function (message, type) {
@@ -220,6 +318,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         .wc-location-message--error {
             border-left: 4px solid #dc3232;
+        }
+        .wc-modal-visible {
+            transform: translateY(0) !important;
+            opacity: 1 !important;
         }
         @keyframes wcSpin {
             0% { transform: rotate(0deg); }

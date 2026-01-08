@@ -440,8 +440,70 @@ add_filter('woocommerce_currency_symbol', function ($symbol, $currency) {
  * FRONTEND POPUP MODAL
  * ------------------------------------------------- */
 
-add_action('wp_footer', function () {
-    include get_template_directory() . '/woocommerce/location-pricing/frontend-popup.php';
+/* -------------------------------------------------
+ * LOCATION SELECTOR MODAL (Always available, hidden by default)
+ * ------------------------------------------------- */
+
+add_action('wp_footer', function() {
+    // Always output the modal HTML, but hide it initially with CSS
+    ?>
+<div id="wc-location-modal" class="wc-location-modal" style="display: none;">
+    <div class="wc-location-modal__overlay"></div>
+    <div class="wc-location-modal__content">
+        <button class="wc-location-modal__close" aria-label="Close modal">&times;</button>
+
+        <div class="wc-location-modal__header">
+            <h2>🌍 Change Your Location</h2>
+            <p>Choose your location to see accurate pricing and stock availability</p>
+        </div>
+
+        <div class="wc-location-modal__options">
+            <div class="wc-location-option" data-location="bd">
+                <div class="wc-location-option__flag">🇧🇩</div>
+                <div class="wc-location-option__details">
+                    <h3>Bangladesh</h3>
+                    <p>Prices in BDT (৳)</p>
+                    <p>Local shipping available</p>
+                </div>
+                <button class="wc-location-option__select" onclick="setWCLocation('bd')">
+                    Select Bangladesh
+                </button>
+            </div>
+
+            <div class="wc-location-option" data-location="au">
+                <div class="wc-location-option__flag">🇦🇺</div>
+                <div class="wc-location-option__details">
+                    <h3>Australia</h3>
+                    <p>Prices in AUD (A$)</p>
+                    <p>International shipping</p>
+                </div>
+                <button class="wc-location-option__select" onclick="setWCLocation('au')">
+                    Select Australia
+                </button>
+            </div>
+        </div>
+
+        <div class="wc-location-modal__footer">
+            <p class="wc-location-modal__note">
+                <small>Your selection will update prices and stock availability immediately.</small>
+            </p>
+        </div>
+    </div>
+</div>
+
+<?php if (!isset($_COOKIE['wc_user_location']) && !is_admin()): ?>
+<script type="text/javascript">
+// Show modal on first visit after page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        if (!document.cookie.match(/wc_user_location/)) {
+            document.getElementById('wc-location-modal').style.display = 'flex';
+            document.body.classList.add('wc-location-modal-open');
+        }
+    }, 1000);
+});
+</script>
+<?php endif;
 });
 
 /* -------------------------------------------------
@@ -490,7 +552,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
 });
 
 /* -------------------------------------------------
- * AJAX HANDLERS FOR LOCATION SWITCHING
+ * AJAX HANDLERS FOR DYNAMIC UPDATES
  * ------------------------------------------------- */
 
 add_action('wp_ajax_wc_switch_location', 'wc_ajax_switch_location');
@@ -511,16 +573,56 @@ function wc_ajax_switch_location() {
     setcookie('wc_user_location', $location, time() + (86400 * 30), '/');
     
     // Clear cart if enabled
-    if (get_theme_mod('wc_location_clear_cart', true)) {
+    $clear_cart = get_theme_mod('wc_location_clear_cart', true);
+    if ($clear_cart && WC()->cart && !WC()->cart->is_empty()) {
         WC()->cart->empty_cart();
+        $cart_cleared = true;
     }
     
     wp_send_json_success([
         'location' => $location,
         'message' => __('Location updated successfully!', 'your-theme'),
+        'clear_cart' => $cart_cleared ?? false,
         'redirect' => remove_query_arg(['force_location'])
     ]);
 }
+
+// Add endpoint for price updates
+add_action('wp_ajax_wc_get_updated_prices', 'wc_ajax_get_updated_prices');
+add_action('wp_ajax_nopriv_wc_get_updated_prices', 'wc_ajax_get_updated_prices');
+
+function wc_ajax_get_updated_prices() {
+    $prices = [];
+    $product_ids = isset($_GET['product_ids']) ? array_map('intval', explode(',', $_GET['product_ids'])) : [];
+    
+    if (!empty($product_ids)) {
+        foreach ($product_ids as $product_id) {
+            $product = wc_get_product($product_id);
+            if ($product) {
+                $prices[$product_id] = $product->get_price_html();
+            }
+        }
+    }
+    
+    wp_send_json_success(['prices' => $prices]);
+}
+
+// Add price update data to localized script
+add_filter('wp_enqueue_scripts', function () {
+    wp_localize_script('wc-location-pricing', 'wc_location_data', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'update_prices_url' => add_query_arg([
+            'action' => 'wc_get_updated_prices',
+            'nonce' => wp_create_nonce('wc_prices_nonce')
+        ], admin_url('admin-ajax.php')),
+        'nonce' => wp_create_nonce('wc_location_nonce'),
+        'current_location' => wc_get_user_location(),
+        'strings' => [
+            'switching_location' => __('Switching location...', 'your-theme'),
+            'location_updated' => __('Location updated!', 'your-theme')
+        ]
+    ]);
+});
 
 /* -------------------------------------------------
  * ADMIN SETTINGS PAGE
