@@ -113,13 +113,10 @@
             // Show success message
             wcLocation.showMessage(response.data.message, "success");
 
-            // Update prices dynamically without reload
-            wcLocation.updatePrices();
-
-            // Optional: Clear cart if needed
-            if (response.data.clear_cart) {
-              wcLocation.clearCart();
-            }
+            // RELOAD THE PAGE AFTER SUCCESS
+            setTimeout(function () {
+              location.reload();
+            }, 800);
           } else {
             wcLocation.showMessage("Failed to update location", "error");
           }
@@ -171,45 +168,42 @@
     },
 
     updatePrices: function () {
-      // Update prices via AJAX or refresh product elements
-      if (typeof wc_location_data.update_prices_url !== "undefined") {
-        $.ajax({
-          url: wc_location_data.update_prices_url,
-          type: "GET",
-          success: function (response) {
-            // Update product prices on the page
-            $(".price").each(function () {
-              var $price = $(this);
-              var productId = $price.closest(".product").data("product_id");
-              if (productId && response.prices && response.prices[productId]) {
-                $price.html(response.prices[productId]);
-              }
-            });
-          },
-        });
-      } else {
-        // Fallback: reload only product containers, not entire page
-        $(".product, .woocommerce-loop-product__link, .product-details").each(
-          function () {
-            var $container = $(this);
-            if ($container.data("product-id")) {
-              $.ajax({
-                url: window.location.href,
-                type: "GET",
-                data: { wc_update_price: $container.data("product-id") },
-                success: function (html) {
-                  var $newContent = $(html).find(
-                    '[data-product-id="' + $container.data("product-id") + '"]'
-                  );
-                  if ($newContent.length) {
-                    $container.replaceWith($newContent);
-                  }
-                },
-              });
-            }
-          }
-        );
+      if (typeof wc_location_data.update_prices_url === "undefined") {
+        window.location.reload();
+        return;
       }
+
+      var productIds = [];
+
+      $("[data-product-id]").each(function () {
+        var id = $(this).data("product-id");
+        if (id) productIds.push(id);
+      });
+
+      if (!productIds.length) return;
+
+      $.ajax({
+        url: wc_location_data.update_prices_url,
+        type: "GET",
+        data: {
+          product_ids: productIds.join(","),
+        },
+        success: function (response) {
+          if (!response.success || !response.data.prices) return;
+
+          $(".product-stock").load(
+            window.location.href + " .product-stock > *"
+          );
+
+          $.each(response.data.prices, function (productId, priceHtml) {
+            $('[data-product-id="' + productId + '"]').html(priceHtml);
+          });
+
+          // Trigger WooCommerce refresh hooks
+          $(document.body).trigger("wc_fragment_refresh");
+          $(document.body).trigger("wc_price_updated");
+        },
+      });
     },
 
     clearCart: function () {
@@ -225,6 +219,7 @@
             $(".cart-contents").html("0");
             $(".woocommerce-cart-form").remove();
             $(".cart-empty").show();
+            $(document).trigger("wc_location_changed", [location]);
           },
         });
       }

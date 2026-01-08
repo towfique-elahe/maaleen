@@ -21,6 +21,7 @@ function maaleen_register_styles() {
     // Enqueue custom CSS files
     $styles = [
         'maaleen-root-style'          => 'assets/css/root.css',
+        'maaleen-woo-single-product'  => 'assets/css/woo-single-product.css',
     ];
 
     foreach ($styles as $handle => $path) {

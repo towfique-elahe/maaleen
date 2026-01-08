@@ -314,7 +314,7 @@ add_filter('woocommerce_add_to_cart_validation', function ($passed, $product_id,
     if ($stock !== '' && $qty > $stock) {
         $product_name = $product->get_name();
         wc_add_notice(
-            sprintf(__('Sorry, only %d "%s" available for your location.', 'your-theme'), $stock, $product_name),
+            sprintf(__('Sorry, only %d "%s" available for your location.', 'maaleen'), $stock, $product_name),
             'error'
         );
         return false;
@@ -436,9 +436,6 @@ add_filter('woocommerce_currency_symbol', function ($symbol, $currency) {
     return $symbol;
 }, 10, 2);
 
-/* -------------------------------------------------
- * FRONTEND POPUP MODAL
- * ------------------------------------------------- */
 
 /* -------------------------------------------------
  * LOCATION SELECTOR MODAL (Always available, hidden by default)
@@ -491,19 +488,67 @@ add_action('wp_footer', function() {
     </div>
 </div>
 
-<?php if (!isset($_COOKIE['wc_user_location']) && !is_admin()): ?>
 <script type="text/javascript">
-// Show modal on first visit after page load
+// Show modal on first visit (only if no cookie exists)
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
+        // Only auto-show on first visit
         if (!document.cookie.match(/wc_user_location/)) {
             document.getElementById('wc-location-modal').style.display = 'flex';
             document.body.classList.add('wc-location-modal-open');
+            // Animate in
+            setTimeout(function() {
+                document.querySelector('.wc-location-modal__content').classList.add(
+                    'wc-modal-visible');
+            }, 10);
         }
     }, 1000);
+
+    // Make setWCLocation available globally
+    window.setWCLocation = function(location) {
+        // Set cookie immediately
+        document.cookie = 'wc_user_location=' + location + '; path=/; max-age=' + (86400 * 30);
+        localStorage.setItem('wc_user_location', location);
+
+        // Hide modal
+        var modal = document.getElementById('wc-location-modal');
+        var content = document.querySelector('.wc-location-modal__content');
+        content.classList.remove('wc-modal-visible');
+
+        setTimeout(function() {
+            modal.style.display = 'none';
+            document.body.classList.remove('wc-location-modal-open');
+
+            // Submit form to update WooCommerce session
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.style.display = 'none';
+
+            var input1 = document.createElement('input');
+            input1.name = 'wc_location';
+            input1.value = location;
+            form.appendChild(input1);
+
+            var input2 = document.createElement('input');
+            input2.name = 'wc_switch_location';
+            input2.value = '1';
+            form.appendChild(input2);
+
+            // Add nonce if available
+            if (typeof wc_location_data !== 'undefined' && wc_location_data.nonce) {
+                var input3 = document.createElement('input');
+                input3.name = 'nonce';
+                input3.value = wc_location_data.nonce;
+                form.appendChild(input3);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }, 200);
+    };
 });
 </script>
-<?php endif;
+<?php
 });
 
 /* -------------------------------------------------
@@ -534,8 +579,8 @@ add_action('wp_enqueue_scripts', function () {
         'nonce' => wp_create_nonce('wc_location_nonce'),
         'current_location' => wc_get_user_location(),
         'strings' => [
-            'switching_location' => __('Switching location...', 'your-theme'),
-            'location_updated' => __('Location updated!', 'your-theme')
+            'switching_location' => __('Switching location...', 'maaleen'),
+            'location_updated' => __('Location updated!', 'maaleen')
         ]
     ]);
 });
@@ -563,13 +608,15 @@ function wc_ajax_switch_location() {
     
     $location = sanitize_text_field($_POST['location']);
     if (!in_array($location, ['bd', 'au'])) {
-        wp_die('Invalid location');
+        wp_send_json_error('Invalid location');
     }
     
-    // Set session and cookie
+    // Set WooCommerce session
     if (WC()->session) {
         WC()->session->set('wc_user_location', $location);
     }
+    
+    // Set cookie (will be set by JavaScript, but also set here for consistency)
     setcookie('wc_user_location', $location, time() + (86400 * 30), '/');
     
     // Clear cart if enabled
@@ -581,9 +628,8 @@ function wc_ajax_switch_location() {
     
     wp_send_json_success([
         'location' => $location,
-        'message' => __('Location updated successfully!', 'your-theme'),
-        'clear_cart' => $cart_cleared ?? false,
-        'redirect' => remove_query_arg(['force_location'])
+        'message' => __('Location updated! Refreshing page...', 'maaleen'),
+        'cart_cleared' => $cart_cleared ?? false
     ]);
 }
 
@@ -618,8 +664,8 @@ add_filter('wp_enqueue_scripts', function () {
         'nonce' => wp_create_nonce('wc_location_nonce'),
         'current_location' => wc_get_user_location(),
         'strings' => [
-            'switching_location' => __('Switching location...', 'your-theme'),
-            'location_updated' => __('Location updated!', 'your-theme')
+            'switching_location' => __('Switching location...', 'maaleen'),
+            'location_updated' => __('Location updated!', 'maaleen')
         ]
     ]);
 });
