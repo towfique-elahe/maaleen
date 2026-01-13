@@ -1,0 +1,165 @@
+.location-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  z-index: 9999;
+}
+
+.location-modal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.location-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.location-box {
+  position: relative;
+  width: 90%;
+  max-width: 380px;
+  background: #fff;
+  padding: 30px;
+  text-align: center;
+  border-radius: 8px;
+  z-index: 10000;
+}
+
+.location-action {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  font-size: 16px;
+  cursor: pointer;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #333;
+}
+
+.location-action:hover {
+  background: #e0e0e0;
+}
+
+.location-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.current-location {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.location-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: #fff;
+  list-style: none;
+  padding: 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 180px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.location-menu li {
+  margin: 0;
+}
+
+.location-menu button {
+  background: none;
+  border: 0;
+  padding: 8px 20px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.location-menu button:hover {
+  background: #f5f5f5;
+}
+
+.location-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.current-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.current-location:hover {
+  background: #e0e0e0;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.current-location.active .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.location-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  list-style: none;
+  padding: 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 180px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.location-menu li {
+  margin: 0;
+}
+
+.location-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: #333;
+  font-size: 14px;
+}
+
+.location-menu button:hover {
+  background: #f5f5f5;
+}

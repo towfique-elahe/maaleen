@@ -21,7 +21,7 @@ function maaleen_register_styles() {
     // Enqueue custom CSS files
     $styles = [
         'maaleen-root-style'          => 'assets/css/root.css',
-        'maaleen-woo-single-product'  => 'assets/css/woo-single-product.css',
+        'maaleen-theme-style'               => 'assets/css/theme.css',
     ];
 
     foreach ($styles as $handle => $path) {
@@ -53,7 +53,7 @@ function maaleen_register_scripts() {
 
     // Enqueue custom JavaScript files
     $scripts = [
-        // 'maaleen-mobile-menu' => 'assets/js/mobile-menu.js',
+        // 'maaleen-user-location' => 'assets/js/user-location.js',
     ];
 
     foreach ($scripts as $handle => $path) {
