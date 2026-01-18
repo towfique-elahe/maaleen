@@ -56,33 +56,20 @@ function set_user_location() {
     wp_send_json_success(['location' => $location]);
 }
 
-// Get user location from session or cookie - IMPROVED
+// Get user location from session or cookie
 function get_user_location() {
     static $location = null;
     
-    // Return cached location if already determined
     if ($location !== null) {
         return $location;
     }
     
-    // Force BD location for debugging - remove this line after testing
-    // return 'bd';
-    
     // Try WooCommerce session first
-    if (function_exists('WC')) {
-        // Initialize WooCommerce session if not already
-        if (!did_action('woocommerce_init')) {
-            if (function_exists('wc_load_cart')) {
-                wc_load_cart();
-            }
-        }
-        
-        if (WC()->session) {
-            $session_location = WC()->session->get('user_location');
-            if ($session_location && in_array($session_location, ['bd', 'au'], true)) {
-                $location = $session_location;
-                return $location;
-            }
+    if (function_exists('WC') && WC()->session) {
+        $session_location = WC()->session->get('user_location');
+        if ($session_location && in_array($session_location, ['bd', 'au'], true)) {
+            $location = $session_location;
+            return $location;
         }
     }
 
@@ -92,7 +79,6 @@ function get_user_location() {
         return $location;
     }
 
-    // Default to BD
     $location = 'bd';
     return $location;
 }
@@ -111,41 +97,69 @@ add_action('init', function() {
             true
         );
     }
-    
-    // Initialize WooCommerce session early
-    if (function_exists('WC') && !WC()->session) {
-        if (function_exists('wc_load_cart')) {
-            wc_load_cart();
-        }
-    }
 });
 
-// Dynamic Product Pricing Based on User Location
+// ============================================
+// SHORTCODE FOR HEADER DROPDOWN
+// ============================================
+
+add_shortcode('location_dropdown', 'location_dropdown_shortcode');
+function location_dropdown_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'style' => 'default',
+        'show_currency' => false,
+    ), $atts, 'location_dropdown');
+    
+    $location = get_user_location();
+    $show_currency = filter_var($atts['show_currency'], FILTER_VALIDATE_BOOLEAN);
+    
+    ob_start();
+    ?>
+<div class="location-dropdown location-dropdown-<?php echo esc_attr($atts['style']); ?>">
+    <button class="current-location" type="button">
+        <?php if ($show_currency): ?>
+        <?php echo $location === 'au' ? '🇦🇺 AU$' : '🇧🇩 ৳'; ?>
+        <?php else: ?>
+        <?php echo $location === 'au' ? '🇦🇺 AU' : '🇧🇩 BD'; ?>
+        <?php endif; ?>
+        <span class="dropdown-arrow">
+            <i class="fa fa-chevron-down" aria-hidden="true"></i>
+        </span>
+    </button>
+
+    <ul class="location-menu">
+        <li>
+            <button class="dropdown-action" type="button" data-location="bd">
+                🇧🇩 Bangladesh <?php echo $show_currency ? '(৳ BDT)' : ''; ?>
+            </button>
+        </li>
+        <li>
+            <button class="dropdown-action" type="button" data-location="au">
+                🇦🇺 Australia <?php echo $show_currency ? '(AU$ AUD)' : ''; ?>
+            </button>
+        </li>
+    </ul>
+</div>
+
+<?php
+    return ob_get_clean();
+}
+
+// ============================================
+// PRICE AND STOCK FILTERS
+// ============================================
+
 add_filter('woocommerce_product_get_price', 'location_based_price', 99, 2);
 add_filter('woocommerce_product_get_regular_price', 'location_based_price', 99, 2);
 add_filter('woocommerce_product_get_sale_price', 'location_based_price', 99, 2);
-add_filter('woocommerce_product_variation_get_price', 'location_based_price', 99, 2);
-add_filter('woocommerce_product_variation_get_regular_price', 'location_based_price', 99, 2);
-add_filter('woocommerce_product_variation_get_sale_price', 'location_based_price', 99, 2);
 
 function location_based_price($price, $product) {
-    // If price is already filtered or empty, return original
-    if (doing_filter('woocommerce_product_variation_get_price') && has_filter('woocommerce_product_variation_get_price', 'location_based_price')) {
-        return $price;
-    }
-    
     $location = get_user_location();
     $meta_key = ($location === 'au') ? 'au_price' : 'bd_price';
     
     $product_id = $product->get_id();
     $custom_price = get_post_meta($product_id, $meta_key, true);
     
-    // Debug log
-    if (current_user_can('administrator') && defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("Product ID: {$product_id}, Location: {$location}, Meta Key: {$meta_key}, Custom Price: {$custom_price}, Original Price: {$price}");
-    }
-    
-    // Only return custom price if it's set and valid
     if ($custom_price !== '' && is_numeric($custom_price) && $custom_price > 0) {
         return (float) $custom_price;
     }
@@ -153,28 +167,56 @@ function location_based_price($price, $product) {
     return $price;
 }
 
-// Handle variation prices
-add_filter('woocommerce_variation_prices_price', 'location_based_variation_prices', 99, 3);
-add_filter('woocommerce_variation_prices_regular_price', 'location_based_variation_prices', 99, 3);
+// ============================================
+// CURRENCY SWITCHING
+// ============================================
 
-function location_based_variation_prices($price, $variation, $product) {
+// Change currency symbol based on location
+add_filter('woocommerce_currency_symbol', 'location_based_currency_symbol', 99, 2);
+function location_based_currency_symbol($currency_symbol, $currency) {
     $location = get_user_location();
-    $meta_key = ($location === 'au') ? 'au_price' : 'bd_price';
     
-    $variation_id = $variation->get_id();
-    $custom_price = get_post_meta($variation_id, $meta_key, true);
-    
-    if ($custom_price !== '' && is_numeric($custom_price) && $custom_price > 0) {
-        return (float) $custom_price;
+    if ($location === 'au') {
+        return 'AU$';
+    } else {
+        return '৳';
     }
     
-    return $price;
+    return $currency_symbol;
 }
 
-// Dynamic Product Stock Switching Based on User Location
-add_filter('woocommerce_product_get_stock_quantity', 'location_based_stock', 99, 2);
-add_filter('woocommerce_product_variation_get_stock_quantity', 'location_based_stock', 99, 2);
+// Change currency code
+add_filter('woocommerce_currency', 'location_based_currency', 99);
+function location_based_currency($currency) {
+    $location = get_user_location();
+    return $location === 'au' ? 'AUD' : 'BDT';
+}
 
+// Change number of decimals for BDT (no decimals)
+add_filter('wc_get_price_decimals', 'location_based_price_decimals', 99);
+function location_based_price_decimals($decimals) {
+    $location = get_user_location();
+    return $location === 'au' ? 2 : 0;
+}
+
+// Change price format
+add_filter('wc_get_price_thousand_separator', 'location_based_thousand_separator', 99);
+function location_based_thousand_separator($separator) {
+    $location = get_user_location();
+    return $location === 'au' ? ',' : ',';
+}
+
+add_filter('wc_get_price_decimal_separator', 'location_based_decimal_separator', 99);
+function location_based_decimal_separator($separator) {
+    $location = get_user_location();
+    return $location === 'au' ? '.' : '';
+}
+
+// ============================================
+// STOCK MANAGEMENT
+// ============================================
+
+add_filter('woocommerce_product_get_stock_quantity', 'location_based_stock', 99, 2);
 function location_based_stock($stock, $product) {
     $location = get_user_location();
     $meta_key = ($location === 'au') ? 'au_stock' : 'bd_stock';
@@ -188,20 +230,12 @@ function location_based_stock($stock, $product) {
     return $stock;
 }
 
-// Stock status filter
 add_filter('woocommerce_product_get_stock_status', 'location_based_stock_status', 99, 2);
-add_filter('woocommerce_product_variation_get_stock_status', 'location_based_stock_status', 99, 2);
-
 function location_based_stock_status($status, $product) {
     $location = get_user_location();
     $meta_key = ($location === 'au') ? 'au_stock' : 'bd_stock';
     
     $stock = (int) get_post_meta($product->get_id(), $meta_key, true);
-    
-    // Debug log
-    if (current_user_can('administrator') && defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("Stock Status - Product ID: {$product->get_id()}, Location: {$location}, Meta Key: {$meta_key}, Stock: {$stock}, Original Status: {$status}");
-    }
     
     if ($stock > 0) {
         return 'instock';
@@ -209,72 +243,36 @@ function location_based_stock_status($status, $product) {
         return 'outofstock';
     }
     
-    // If no custom stock is set, return the original status
     return $status;
 }
 
-// Add location-based price and stock to product variations
-add_filter('woocommerce_available_variation', 'location_based_variation_data', 99, 3);
+// ============================================
+// CLEAR CACHE
+// ============================================
 
-function location_based_variation_data($variation_data, $product, $variation) {
-    $location = get_user_location();
-    $variation_id = $variation->get_id();
-    
-    // Update price
-    $price_meta_key = ($location === 'au') ? 'au_price' : 'bd_price';
-    $custom_price = get_post_meta($variation_id, $price_meta_key, true);
-    
-    if ($custom_price !== '' && is_numeric($custom_price) && $custom_price > 0) {
-        $variation_data['display_price'] = wc_price($custom_price);
-        $variation_data['display_regular_price'] = wc_price($custom_price);
-        $variation_data['price'] = $custom_price;
-        $variation_data['regular_price'] = $custom_price;
-    }
-    
-    // Update stock
-    $stock_meta_key = ($location === 'au') ? 'au_stock' : 'bd_stock';
-    $custom_stock = get_post_meta($variation_id, $stock_meta_key, true);
-    
-    if ($custom_stock !== '' && is_numeric($custom_stock)) {
-        $variation_data['max_qty'] = $custom_stock;
-        $variation_data['backorders_allowed'] = false;
-        $variation_data['is_in_stock'] = $custom_stock > 0;
-        $variation_data['variation_is_active'] = true;
-    }
-    
-    return $variation_data;
-}
-
-// Clear price cache when location changes
 add_action('wp', function() {
     if (function_exists('WC')) {
         global $wpdb;
-        
-        // Clear WooCommerce product price cache
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%wc_var_prices%'");
         $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%transient_wc_var_prices%'");
     }
 });
 
-// Debug function to check if it's working
+// ============================================
+// DEBUG FUNCTION
+// ============================================
+
 add_action('wp_footer', function() {
     if (current_user_can('administrator')) {
-        echo '<div style="position:fixed;bottom:10px;left:10px;background:#fff;padding:10px;border:1px solid #000;z-index:99999;max-width:400px;max-height:300px;overflow:auto;">';
-        echo '<h4 style="margin:0 0 10px 0;">Location Debug Info:</h4>';
+        echo '<div style="position:fixed;bottom:10px;left:10px;background:#fff;padding:10px;border:1px solid #000;z-index:99999;max-width:400px;max-height:300px;overflow:auto;font-size:12px;">';
+        echo '<h4 style="margin:0 0 10px 0;">Location Debug:</h4>';
         echo 'Current Location: <strong>' . get_user_location() . '</strong><br>';
-        echo 'Cookie: ' . (isset($_COOKIE['user_location']) ? $_COOKIE['user_location'] : 'Not set') . '<br>';
+        echo 'Currency: <strong>' . get_woocommerce_currency() . '</strong><br>';
+        echo 'Currency Symbol: <strong>' . get_woocommerce_currency_symbol() . '</strong><br>';
         
-        if (function_exists('WC') && WC()->session) {
-            echo 'Session: ' . WC()->session->get('user_location') . '<br>';
-            echo 'Session ID: ' . WC()->session->get_customer_id() . '<br>';
-        } else {
-            echo 'Session: WooCommerce session not initialized<br>';
-        }
-        
-        // Test with first few products
         $args = array(
             'post_type' => 'product',
-            'posts_per_page' => 3,
+            'posts_per_page' => 2,
             'post_status' => 'publish'
         );
         
@@ -288,40 +286,43 @@ add_action('wp_footer', function() {
                 $product = wc_get_product($product_post->ID);
                 if ($product) {
                     echo '<div style="margin-bottom:10px;padding:5px;background:#f5f5f5;">';
-                    echo 'Product: ' . $product->get_name() . ' (ID: ' . $product->get_id() . ')<br>';
-                    echo 'BD Price Meta: ' . get_post_meta($product->get_id(), 'bd_price', true) . '<br>';
-                    echo 'AU Price Meta: ' . get_post_meta($product->get_id(), 'au_price', true) . '<br>';
-                    echo 'Current Display Price: ' . $product->get_price_html() . '<br>';
-                    echo 'Raw Price: ' . $product->get_price() . '<br>';
+                    echo 'Product: ' . $product->get_name() . '<br>';
+                    echo 'BD Price: ' . get_post_meta($product->get_id(), 'bd_price', true) . '<br>';
+                    echo 'AU Price: ' . get_post_meta($product->get_id(), 'au_price', true) . '<br>';
+                    echo 'Display: ' . $product->get_price_html() . '<br>';
                     echo '</div>';
                 }
             }
         }
         
         echo '<hr style="margin:10px 0;">';
-        echo '<button onclick="clearLocationCookies()" style="padding:5px 10px;background:#f00;color:white;border:none;cursor:pointer;">Clear Location & Reload</button>';
+        echo '<button onclick="clearLocation()" style="padding:5px 10px;background:#f00;color:white;border:none;cursor:pointer;margin-right:10px;">Clear & Reset</button>';
+        echo '<button onclick="switchLocation()" style="padding:5px 10px;background:#0066cc;color:white;border:none;cursor:pointer;">Switch Location</button>';
         echo '</div>';
         
         echo '<script>
-        function clearLocationCookies() {
+        function clearLocation() {
             document.cookie = "user_location=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            if (typeof WC !== "undefined" && WC.session) {
-                fetch("' . admin_url('admin-ajax.php') . '", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                    body: "action=set_user_location&location=bd&nonce=' . wp_create_nonce('set_user_location_nonce') . '"
-                }).then(() => window.location.reload(true));
-            } else {
-                window.location.reload(true);
-            }
+            window.location.reload(true);
+        }
+        
+        function switchLocation() {
+            const newLocation = "' . (get_user_location() === 'au' ? 'bd' : 'au') . '";
+            fetch("' . admin_url('admin-ajax.php') . '", {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: "action=set_user_location&location=" + newLocation + "&nonce=' . wp_create_nonce('set_user_location_nonce') . '"
+            }).then(() => window.location.reload(true));
         }
         </script>';
     }
 });
 
-// Location modal HTML
+// ============================================
+// LOCATION MODAL
+// ============================================
+
 add_action('wp_footer', function () {
-    // Don't show modal for admin users or if already set
     if (current_user_can('administrator') || isset($_COOKIE['user_location'])) {
         return;
     }
@@ -331,17 +332,20 @@ add_action('wp_footer', function () {
     <div class="location-box">
         <h3>Select Your Location</h3>
         <button class="location-action" data-location="bd">
-            🇧🇩 Bangladesh
+            🇧🇩 Bangladesh (৳ BDT)
         </button>
         <button class="location-action" data-location="au">
-            🇦🇺 Australia
+            🇦🇺 Australia (AU$ AUD)
         </button>
     </div>
 </div>
 <?php
 });
 
-// Location modal and dropdown script
+// ============================================
+// JAVASCRIPT FOR DROPDOWN AND MODAL
+// ============================================
+
 add_action('wp_footer', function () {
     $nonce = wp_create_nonce('set_user_location_nonce');
 ?>
@@ -354,119 +358,132 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.classList.add('active');
     }
 
-    // Handle location selection from modal
+    // Handle modal location selection
     document.querySelectorAll('.location-action').forEach(btn => {
         btn.addEventListener('click', function() {
             const loc = this.dataset.location;
-
-            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: new URLSearchParams({
-                        action: 'set_user_location',
-                        location: loc,
-                        nonce: '<?php echo $nonce; ?>'
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.reload(true);
-                    } else {
-                        alert('Error: ' + (data.data || 'Unknown error'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    window.location.reload(true);
-                });
+            updateLocation(loc, this);
         });
     });
 
-    // Dropdown functionality
-    const dropdown = document.querySelector('.location-dropdown');
-    const currentLocationBtn = document.querySelector('.current-location');
-    const locationMenu = document.querySelector('.location-menu');
-    const dropdownActions = document.querySelectorAll('.dropdown-action');
-
-    if (dropdown && currentLocationBtn && locationMenu) {
-        // Toggle dropdown menu
-        currentLocationBtn.addEventListener('click', function(e) {
+    // Handle dropdown location selection
+    document.querySelectorAll('.dropdown-action').forEach(btn => {
+        btn.addEventListener('click', function(e) {
             e.stopPropagation();
-            const isVisible = locationMenu.style.display === 'block';
-            locationMenu.style.display = isVisible ? 'none' : 'block';
-            this.classList.toggle('active', !isVisible);
+            const loc = this.dataset.location;
+            const dropdown = this.closest('.location-dropdown');
+            const currentBtn = dropdown.querySelector('.current-location');
+            const menu = dropdown.querySelector('.location-menu');
+
+            // Close menu
+            if (menu) menu.style.display = 'none';
+
+            // Update button text immediately
+            const showCurrency = currentBtn.textContent.includes('$') || currentBtn.textContent
+                .includes('৳');
+            currentBtn.innerHTML = loc === 'au' ?
+                '🇦🇺 ' + (showCurrency ? 'AU$' : 'AU') +
+                ' <span class="dropdown-arrow">▼</span>' :
+                '🇧🇩 ' + (showCurrency ? '৳' : 'BD') +
+                ' <span class="dropdown-arrow">▼</span>';
+
+            updateLocation(loc, this);
         });
+    });
 
-        // Handle dropdown location selection
-        dropdownActions.forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const loc = this.dataset.location;
+    // Dropdown toggle functionality
+    document.querySelectorAll('.current-location').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = this.closest('.location-dropdown');
+            const menu = dropdown.querySelector('.location-menu');
+            if (menu) {
+                menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                dropdown.classList.toggle('active', menu.style.display === 'block');
+            }
+        });
+    });
 
-                // Close dropdown
-                locationMenu.style.display = 'none';
-                currentLocationBtn.classList.remove('active');
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.location-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+        document.querySelectorAll('.location-dropdown').forEach(dropdown => {
+            dropdown.classList.remove('active');
+        });
+    });
 
-                // Update button text immediately
-                currentLocationBtn.innerHTML = loc === 'au' ?
-                    '🇦🇺 AU <span class="dropdown-arrow">▼</span>' :
-                    '🇧🇩 BD <span class="dropdown-arrow">▼</span>';
+    // Prevent dropdown from closing when clicking inside it
+    document.querySelectorAll('.location-menu').forEach(menu => {
+        menu.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    });
 
-                // Send AJAX request
-                fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        },
-                        body: new URLSearchParams({
-                            action: 'set_user_location',
-                            location: loc,
-                            nonce: '<?php echo $nonce; ?>'
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Show success message
-                            const message = document.createElement('div');
-                            message.style.cssText =
-                                'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:12px 20px;border-radius:4px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.1);';
-                            message.textContent = 'Location updated! Reloading...';
-                            document.body.appendChild(message);
+    // Function to update location
+    function updateLocation(loc, button) {
+        const originalText = button.textContent;
+        button.textContent = 'Switching...';
+        button.disabled = true;
 
-                            setTimeout(() => {
-                                window.location.reload(true);
-                            }, 500);
-                        } else {
-                            alert('Error: ' + (data.data || 'Unknown error'));
-                            // Revert button text
-                            currentLocationBtn.innerHTML =
-                                '<?php echo get_user_location() === "au" ? "🇦🇺 AU" : "🇧🇩 BD"; ?> <span class="dropdown-arrow">▼</span>';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Network error occurred');
-                        // Revert button text
-                        currentLocationBtn.innerHTML =
-                            '<?php echo get_user_location() === "au" ? "🇦🇺 AU" : "🇧🇩 BD"; ?> <span class="dropdown-arrow">▼</span>';
-                    });
+        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    action: 'set_user_location',
+                    location: loc,
+                    nonce: '<?php echo $nonce; ?>'
+                })
+            }).then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const currency = loc === 'au' ? 'AU$ (AUD)' : '৳ (BDT)';
+                    showMessage('Location updated to ' + currency + '! Reloading...', 'success');
+                    setTimeout(() => window.location.reload(true), 1000);
+                } else {
+                    showMessage('Error: ' + (data.data || 'Unknown error'), 'error');
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Network error occurred', 'error');
+                button.textContent = originalText;
+                button.disabled = false;
             });
-        });
+    }
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function() {
-            locationMenu.style.display = 'none';
-            currentLocationBtn.classList.remove('active');
-        });
+    // Function to show messages
+    function showMessage(text, type) {
+        // Remove existing messages
+        document.querySelectorAll('.location-message').forEach(msg => msg.remove());
 
-        // Prevent dropdown from closing when clicking inside it
-        locationMenu.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+        const message = document.createElement('div');
+        message.className = 'location-message';
+        message.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            z-index: 10000;
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        `;
+        message.textContent = text;
+        document.body.appendChild(message);
+
+        setTimeout(() => {
+            if (message.parentNode) {
+                message.parentNode.removeChild(message);
+            }
+        }, 3000);
     }
 });
 </script>
