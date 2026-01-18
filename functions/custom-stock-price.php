@@ -259,66 +259,6 @@ add_action('wp', function() {
 });
 
 // ============================================
-// DEBUG FUNCTION
-// ============================================
-
-add_action('wp_footer', function() {
-    if (current_user_can('administrator')) {
-        echo '<div style="position:fixed;bottom:10px;left:10px;background:#fff;padding:10px;border:1px solid #000;z-index:99999;max-width:400px;max-height:300px;overflow:auto;font-size:12px;">';
-        echo '<h4 style="margin:0 0 10px 0;">Location Debug:</h4>';
-        echo 'Current Location: <strong>' . get_user_location() . '</strong><br>';
-        echo 'Currency: <strong>' . get_woocommerce_currency() . '</strong><br>';
-        echo 'Currency Symbol: <strong>' . get_woocommerce_currency_symbol() . '</strong><br>';
-        
-        $args = array(
-            'post_type' => 'product',
-            'posts_per_page' => 2,
-            'post_status' => 'publish'
-        );
-        
-        $products = get_posts($args);
-        
-        if ($products) {
-            echo '<hr style="margin:10px 0;">';
-            echo '<h5 style="margin:10px 0 5px 0;">Sample Products:</h5>';
-            
-            foreach ($products as $product_post) {
-                $product = wc_get_product($product_post->ID);
-                if ($product) {
-                    echo '<div style="margin-bottom:10px;padding:5px;background:#f5f5f5;">';
-                    echo 'Product: ' . $product->get_name() . '<br>';
-                    echo 'BD Price: ' . get_post_meta($product->get_id(), 'bd_price', true) . '<br>';
-                    echo 'AU Price: ' . get_post_meta($product->get_id(), 'au_price', true) . '<br>';
-                    echo 'Display: ' . $product->get_price_html() . '<br>';
-                    echo '</div>';
-                }
-            }
-        }
-        
-        echo '<hr style="margin:10px 0;">';
-        echo '<button onclick="clearLocation()" style="padding:5px 10px;background:#f00;color:white;border:none;cursor:pointer;margin-right:10px;">Clear & Reset</button>';
-        echo '<button onclick="switchLocation()" style="padding:5px 10px;background:#0066cc;color:white;border:none;cursor:pointer;">Switch Location</button>';
-        echo '</div>';
-        
-        echo '<script>
-        function clearLocation() {
-            document.cookie = "user_location=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            window.location.reload(true);
-        }
-        
-        function switchLocation() {
-            const newLocation = "' . (get_user_location() === 'au' ? 'bd' : 'au') . '";
-            fetch("' . admin_url('admin-ajax.php') . '", {
-                method: "POST",
-                headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                body: "action=set_user_location&location=" + newLocation + "&nonce=' . wp_create_nonce('set_user_location_nonce') . '"
-            }).then(() => window.location.reload(true));
-        }
-        </script>';
-    }
-});
-
-// ============================================
 // LOCATION MODAL
 // ============================================
 
