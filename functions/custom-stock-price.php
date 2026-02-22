@@ -1126,3 +1126,6 @@ jQuery(function($) {
 <?php
     }
 }
+
+// Disable WooCommerce add to cart notice
+add_filter( 'wc_add_to_cart_message_html', '__return_false' );
