@@ -146,6 +146,201 @@ function location_dropdown_shortcode($atts) {
 }
 
 // ============================================
+// REMOVE UNWANTED PRODUCT TAXONOMIES AND META BOXES
+// ============================================
+
+// Remove product brands taxonomy
+add_action('init', 'remove_product_brands_taxonomy', 100);
+function remove_product_brands_taxonomy() {
+    global $wp_taxonomies;
+    
+    // Unregister product brands taxonomy if it exists
+    if (taxonomy_exists('product_brand')) {
+        unset($wp_taxonomies['product_brand']);
+    }
+    if (taxonomy_exists('product_brands')) {
+        unset($wp_taxonomies['product_brands']);
+    }
+    if (taxonomy_exists('brand')) {
+        unset($wp_taxonomies['brand']);
+    }
+    if (taxonomy_exists('brands')) {
+        unset($wp_taxonomies['brands']);
+    }
+}
+
+// Remove all product attribute taxonomies
+add_action('init', 'remove_product_attribute_taxonomies', 100);
+function remove_product_attribute_taxonomies() {
+    global $wp_taxonomies;
+    
+    // Get all taxonomy names
+    if (!empty($wp_taxonomies)) {
+        foreach ($wp_taxonomies as $tax_key => $taxonomy) {
+            // Check if it's a product attribute taxonomy (starts with 'pa_')
+            if (strpos($tax_key, 'pa_') === 0) {
+                unset($wp_taxonomies[$tax_key]);
+            }
+        }
+    }
+}
+
+// Remove product brand and attribute meta boxes from product edit page
+add_action('add_meta_boxes', 'remove_unwanted_product_meta_boxes', 100);
+function remove_unwanted_product_meta_boxes() {
+    // Remove brand meta boxes
+    remove_meta_box('product_branddiv', 'product', 'side');
+    remove_meta_box('product_brandsdiv', 'product', 'side');
+    remove_meta_box('branddiv', 'product', 'side');
+    remove_meta_box('tagsdiv-product_brand', 'product', 'side');
+    remove_meta_box('tagsdiv-product_brands', 'product', 'side');
+    
+    // Remove all attribute meta boxes
+    global $wp_taxonomies;
+    if (!empty($wp_taxonomies)) {
+        foreach ($wp_taxonomies as $tax_key => $taxonomy) {
+            if (strpos($tax_key, 'pa_') === 0) {
+                remove_meta_box($tax_key . 'div', 'product', 'side');
+            }
+        }
+    }
+}
+
+// Hide the entire Product Data block (WooCommerce product data meta box)
+add_action('admin_head', 'hide_product_data_block');
+function hide_product_data_block() {
+    global $post_type;
+    
+    if ($post_type === 'product') {
+        ?>
+<style>
+/* Hide the Product Data meta box */
+#woocommerce-product-data {
+    display: none !important;
+}
+
+/* Hide any other product data sections */
+.postbox .woocommerce_product_data {
+    display: none !important;
+}
+
+/* Hide Product Data in block editor if using Gutenberg */
+.woocommerce-product-data {
+    display: none !important;
+}
+
+/* Hide the product data tabs that might appear elsewhere */
+.product_data_tabs {
+    display: none !important;
+}
+
+/* Hide any attribute related sections */
+.product_attributes {
+    display: none !important;
+}
+</style>
+<?php
+    }
+}
+
+// Completely disable WooCommerce product data panels via filter
+add_filter('woocommerce_product_data_tabs', 'disable_product_data_tabs');
+function disable_product_data_tabs($tabs) {
+    // Return empty array to hide all tabs
+    return array();
+}
+
+// Remove all WooCommerce product data panels
+add_action('admin_init', 'remove_product_data_panels');
+function remove_product_data_panels() {
+    // Remove all standard product data panels
+    remove_meta_box('woocommerce-product-data', 'product', 'normal');
+    remove_meta_box('woocommerce-product-images', 'product', 'side');
+    
+    // Remove inventory panel
+    remove_meta_box('postexcerpt', 'product', 'normal');
+    
+    // Remove any other WooCommerce specific meta boxes
+    remove_meta_box('tagsdiv-product_tag', 'product', 'side');
+    remove_meta_box('product_catdiv', 'product', 'side');
+}
+
+// Hide Custom Fields meta box
+add_action('admin_head', 'hide_custom_fields_metabox');
+function hide_custom_fields_metabox() {
+    global $post_type;
+    
+    if ($post_type === 'product') {
+        ?>
+<style>
+/* Hide Custom Fields meta box */
+#postcustom,
+#postcustom h2,
+.postbox#postcustom {
+    display: none !important;
+}
+
+/* Hide any other meta boxes we don't need */
+#tagsdiv-product_tag,
+#product_catdiv,
+#slugdiv,
+#authordiv,
+#revisionsdiv,
+#commentstatusdiv,
+#commentsdiv {
+    display: none !important;
+}
+
+/* Hide the Screen Options for these boxes */
+.metabox-prefs label[for="postcustom-hide"],
+.metabox-prefs label[for="tagsdiv-product_tag-hide"],
+.metabox-prefs label[for="product_catdiv-hide"] {
+    display: none !important;
+}
+</style>
+<?php
+    }
+}
+
+// Remove custom fields from the post editing screen completely
+add_filter('default_hidden_meta_boxes', 'hide_all_meta_boxes', 10, 2);
+function hide_all_meta_boxes($hidden, $screen) {
+    if ('product' === $screen->id) {
+        // Add all meta boxes we want hidden by default
+        $hidden[] = 'postcustom'; // Custom Fields
+        $hidden[] = 'slugdiv'; // Slug
+        $hidden[] = 'authordiv'; // Author
+        $hidden[] = 'revisionsdiv'; // Revisions
+        $hidden[] = 'commentstatusdiv'; // Discussion
+        $hidden[] = 'commentsdiv'; // Comments
+        $hidden[] = 'trackbacksdiv'; // Trackbacks
+        $hidden[] = 'woocommerce-product-data'; // Product Data
+    }
+    return $hidden;
+}
+
+// Remove product attributes from frontend queries
+add_filter('woocommerce_attribute', 'remove_product_attributes', 10, 3);
+function remove_product_attributes($output, $attribute, $values) {
+    // Return empty string to hide all attributes on frontend
+    return '';
+}
+
+// Remove product attributes from structured data
+add_filter('woocommerce_structured_data_product', 'remove_attributes_from_structured_data', 10, 2);
+function remove_attributes_from_structured_data($markup, $product) {
+    // Remove attributes from structured data
+    if (isset($markup['brand'])) {
+        unset($markup['brand']);
+    }
+    return $markup;
+}
+
+// Remove brand from WooCommerce product blocks
+add_filter('woocommerce_product_get_brand', '__return_empty_string');
+add_filter('woocommerce_product_get_brands', '__return_empty_array');
+
+// ============================================
 // LOCATION-BASED PRICE META FIELDS
 // ============================================
 
@@ -1464,7 +1659,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================
-// CSS STYLES FOR SIZE BUTTONS
+// CSS STYLES FOR SIZE BUTTONS AND ADMIN HIDING
 // ============================================
 
 add_action('wp_head', 'add_size_selector_styles');
