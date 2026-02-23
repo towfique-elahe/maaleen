@@ -1112,7 +1112,7 @@ function product_size_selector_shortcode($atts) {
 
     <?php if ($label): ?>
     <div class="size-selector-label">
-        <strong><?php echo esc_html($label); ?></strong>
+        <?php echo esc_html($label); ?>
         <?php if ($required): ?>
         <span class="required-asterisk">*</span>
         <?php endif; ?>
@@ -1302,54 +1302,6 @@ function add_size_selector_to_product_page() {
 }
 
 // ============================================
-// DISPLAY SIZE STOCK STATUS
-// ============================================
-
-add_action('woocommerce_before_add_to_cart_button', 'display_size_stock_status');
-function display_size_stock_status() {
-    global $product;
-    
-    if (!$product || $product->is_type('variable')) {
-        return;
-    }
-    
-    $sizes = get_product_sizes($product->get_id());
-    if (empty($sizes)) {
-        return;
-    }
-    
-    $location = get_user_location();
-    $manages_size_stock = manages_size_stock($product->get_id(), $location);
-    
-    if (!$manages_size_stock) {
-        return;
-    }
-    
-    ?>
-<div class="size-stock-info"
-    style="margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #007cba;">
-    <strong style="display: block; margin-bottom: 10px;">📦 Size Availability
-        (<?php echo strtoupper($location); ?>):</strong>
-    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-        <?php foreach ($sizes as $size): 
-                $stock = get_size_stock($product->get_id(), $size, $location);
-                $stock_status = $stock > 0 ? 'In stock: ' . $stock : 'Out of stock';
-                $status_class = $stock > 0 ? 'in-stock' : 'out-of-stock';
-                $bg_color = $stock > 0 ? '#e8f5e9' : '#ffebee';
-                $border_color = $stock > 0 ? '#4caf50' : '#f44336';
-                ?>
-        <div class="size-stock-item <?php echo esc_attr($status_class); ?>"
-            style="padding: 8px 15px; background: <?php echo $bg_color; ?>; border-left: 4px solid <?php echo $border_color; ?>; border-radius: 3px; min-width: 80px;">
-            <span style="font-weight: bold; font-size: 16px;"><?php echo esc_html($size); ?></span><br>
-            <span style="font-size: 12px; color: #666;"><?php echo esc_html($stock_status); ?></span>
-        </div>
-        <?php endforeach; ?>
-    </div>
-</div>
-<?php
-}
-
-// ============================================
 // CLEAR CACHE
 // ============================================
 
@@ -1425,9 +1377,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 .includes('৳');
             currentBtn.innerHTML = loc === 'au' ?
                 '🇦🇺 ' + (showCurrency ? 'AU$' : 'AU') +
-                ' <span class="dropdown-arrow">▼</span>' :
+                ' <span class="dropdown-arrow"><i class="fa fa-chevron-down" aria-hidden="true"></i></span>' :
                 '🇧🇩 ' + (showCurrency ? '৳' : 'BD') +
-                ' <span class="dropdown-arrow">▼</span>';
+                ' <span class="dropdown-arrow"><i class="fa fa-chevron-down" aria-hidden="true"></i></span>';
 
             updateLocation(loc, this);
         });
@@ -1537,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Auto-select first available size if only one
         document.querySelectorAll('.product-size-selector').forEach(selector => {
             const availableSizes = selector.querySelectorAll(
-            '.size-button.in-stock:not(.out-of-stock)');
+                '.size-button.in-stock:not(.out-of-stock)');
             const selectedInput = selector.querySelector('.selected-size-input');
 
             if (!selectedInput.value && availableSizes.length === 1) {
@@ -1673,14 +1625,14 @@ function add_size_selector_styles() {
 
 .size-selector-label {
     margin-bottom: 10px;
-    font-family: inherit;
-    font-size: 14px;
+    font-family: "Poppins", Sans-serif;
+    font-size: 15px;
     font-weight: 500;
-    color: #333;
+    color: var(--e-global-color-text);
 }
 
 .required-asterisk {
-    color: #d63638;
+    color: crimson;
     margin-left: 3px;
 }
 
@@ -1695,9 +1647,9 @@ function add_size_selector_styles() {
 /* Default Button Style */
 .size-buttons-style.style-default .size-button {
     padding: 8px 20px !important;
-    border: 2px solid #ddd !important;
+    border: var(--border) !important;
     background: transparent !important;
-    color: #333 !important;
+    color: var(--dark-text-color) !important;
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
@@ -1709,13 +1661,13 @@ function add_size_selector_styles() {
 }
 
 .size-buttons-style.style-default .size-button:hover:not(.out-of-stock) {
-    border-color: #007cba !important;
-    background: #f0f8ff !important;
+    border-color: var(--accent-color) !important;
+    background: var(--secondary-color) !important;
 }
 
 .size-buttons-style.style-default .size-button.in-stock.selected {
-    border-color: #007cba !important;
-    background: #007cba !important;
+    border-color: var(--accent-color) !important;
+    background: var(--accent-color) !important;
     color: white !important;
 }
 
@@ -1732,7 +1684,7 @@ function add_size_selector_styles() {
     position: absolute;
     top: -8px;
     right: -8px;
-    background: #4caf50;
+    background: var(--e-global-color-accent);
     color: white;
     font-size: 10px;
     padding: 2px 6px;
@@ -1754,13 +1706,13 @@ function add_size_selector_styles() {
 }
 
 .size-buttons-style.style-rounded .size-button:hover:not(.out-of-stock) {
-    border-color: #666;
-    background: #f5f5f5;
+    border-color: var(--text-color);
+    background: var(--secondary-color);
 }
 
 .size-buttons-style.style-rounded .size-button.in-stock.selected {
-    border-color: #007cba;
-    background: #007cba;
+    border-color: var(--accent-color);
+    background: var(--accent-color);
     color: white;
 }
 
@@ -1772,19 +1724,19 @@ function add_size_selector_styles() {
     border-radius: 3px;
     cursor: pointer;
     font-size: 13px;
-    color: #666;
+    color: var(--text-color);
     transition: all 0.2s ease;
     position: relative;
 }
 
 .size-buttons-style.style-minimal .size-button:hover:not(.out-of-stock) {
-    border-color: #333;
-    color: #333;
+    border-color: var(--dark-text-color);
+    color: var(--dark-text-color);
 }
 
 .size-buttons-style.style-minimal .size-button.in-stock.selected {
-    border-color: #333;
-    background: #333;
+    border-color: var(--accent-color);
+    background: var(--accent-color);
     color: white;
 }
 
@@ -1794,7 +1746,7 @@ function add_size_selector_styles() {
 .product-sizes-badges {
     font-family: inherit;
     font-size: 13px;
-    color: #666;
+    color: var(--text-color);
     margin-top: 5px;
     line-height: 1.4;
 }
@@ -1822,9 +1774,10 @@ function add_size_selector_styles() {
 }
 
 .size-badge {
-    background: #f0f0f0;
     padding: 3px 8px;
     border-radius: 3px;
+    background: var(--accent-color);
+    color: var(--secondary-color);
     font-size: 12px;
 }
 
@@ -1836,7 +1789,7 @@ function add_size_selector_styles() {
 
 /* Error State */
 .size-buttons-container.size-error {
-    border: 2px solid #d63638;
+    border: 2px solid var(--accent-color);
     padding: 10px;
     border-radius: 4px;
     animation: sizeErrorPulse 0.5s ease-in-out;
@@ -1846,20 +1799,20 @@ function add_size_selector_styles() {
 
     0%,
     100% {
-        border-color: #d63638;
+        border-color: var(--accent-color);
     }
 
     50% {
-        border-color: #ff6b6b;
+        border-color: var(--accent-color);
     }
 }
 
 .size-error-message {
-    color: #d63638;
+    color: var(--accent-color);
     font-size: 13px;
     margin-top: 5px;
     padding: 5px 10px;
-    background: #ffebee;
+    background: var(--secondary-color);
     border-radius: 3px;
 }
 
@@ -1867,9 +1820,9 @@ function add_size_selector_styles() {
 .size-stock-info {
     margin: 15px 0;
     padding: 15px;
-    background: #f9f9f9;
+    background: var(--secondary-color);
     border-radius: 4px;
-    border-left: 3px solid #007cba;
+    border-left: 3px solid var(--accent-color);
 }
 
 .size-stock-item {
@@ -1895,7 +1848,7 @@ function add_size_selector_styles() {
     left: 50%;
     margin-top: -6px;
     margin-left: -6px;
-    border: 2px solid #007cba;
+    border: 2px solid var(--accent-color);
     border-top-color: transparent;
     border-radius: 50%;
     animation: button-loading-spinner 0.6s linear infinite;
@@ -1951,7 +1904,7 @@ function add_size_selector_styles() {
 .location-box h3 {
     margin-top: 0;
     margin-bottom: 20px;
-    color: #333;
+    color: var(--dark-text-color);
     font-size: 24px;
 }
 
@@ -1970,8 +1923,8 @@ function add_size_selector_styles() {
 }
 
 .location-action:hover {
-    border-color: #007cba;
-    background: #f0f8ff;
+    border-color: var(--accent-color);
+    background: var(--secondary-color);
 }
 
 .location-action[data-location="bd"]:hover {
@@ -1989,16 +1942,25 @@ function add_size_selector_styles() {
 }
 
 .current-location {
-    background: transparent;
+    background: var(--primary-color);
     border: none;
+    border-color: var(--primary-color);
+    outline: none;
     padding: 8px 15px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    color: #333;
+    color: var(--dark-text-color);
     display: flex;
     align-items: center;
     gap: 5px;
+}
+
+@media only screen and (max-width: 767px) {
+    selector .current-location {
+        margin-top: -35px;
+        font-size: 12px;
+    }
 }
 
 .dropdown-arrow {
